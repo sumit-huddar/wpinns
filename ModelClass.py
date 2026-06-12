@@ -75,7 +75,13 @@ class Pinns(nn.Module):
         self.act_string = str(network_properties["activation"])
         self.iterations = int(network_properties["iterations"])
         self.reset_freq = network_properties["reset_freq"]
-        self.loss = network_properties["loss_type"]
+        loss_type = network_properties["loss_type"]
+        if loss_type == "l2":
+            self.loss = nn.MSELoss()
+        elif loss_type == "l1":
+            self.loss = nn.L1Loss()
+        else:
+            self.loss = loss_type
 
         self.activation = activation(self.act_string)
 

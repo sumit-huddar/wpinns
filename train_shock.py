@@ -17,6 +17,7 @@ import time
 import torch
 import torch.optim as optim
 
+
 # ── patch: override what_solving before the class is used ──────────────────
 from EquationModels import ShockRarEntropy as _src
 
@@ -84,42 +85,48 @@ N_b_train = int(N_u_train / (4 * Ec.space_dimensions))
 N_i_train = N_u_train - 2 * Ec.space_dimensions * N_b_train
 
 dataset = DefineDataset(Ec, N_coll, N_b_train, N_i_train, N_int,
-                        sampling_seed, ensemble_configurations["batch_size"],
                         ensemble_configurations["batch_size"],
+                        sampling_seed,
                         shuffle=False)
+dataset.assemble_dataset()
 
 # ── Build networks ─────────────────────────────────────────────────────────
-loss_fn = torch.nn.MSELoss()
+network_props_sol = {
+    "hidden_layers":          ensemble_configurations["hidden_layers_sol"],
+    "neurons":                ensemble_configurations["neurons_sol"],
+    "residual_parameter":     ensemble_configurations["residual_parameter"],
+    "kernel_regularizer":     ensemble_configurations["kernel_regularizer"],
+    "regularization_parameter": ensemble_configurations["regularization_parameter_sol"],
+    "epochs":                 ensemble_configurations["epochs"],
+    "activation":             ensemble_configurations["activation_sol"],
+    "iterations":             ensemble_configurations["iterations_max"],
+    "reset_freq":             ensemble_configurations["reset_freq"],
+    "loss_type":              ensemble_configurations["loss_type"],
+}
+
+network_props_test = {
+    "hidden_layers":          ensemble_configurations["hidden_layers_test"],
+    "neurons":                ensemble_configurations["neurons_test"],
+    "residual_parameter":     ensemble_configurations["residual_parameter"],
+    "kernel_regularizer":     ensemble_configurations["kernel_regularizer"],
+    "regularization_parameter": ensemble_configurations["regularization_parameter_test"],
+    "epochs":                 ensemble_configurations["epochs"],
+    "activation":             ensemble_configurations["activation_test"],
+    "iterations":             ensemble_configurations["iterations_max"],
+    "reset_freq":             ensemble_configurations["reset_freq"],
+}
 
 torch.manual_seed(42)
 solution_model = Pinns(
     input_dimension=Ec.space_dimensions + Ec.time_dimensions,
     output_dimension=Ec.output_dimension,
-    n_hidden_layers=ensemble_configurations["hidden_layers_sol"],
-    neurons=ensemble_configurations["neurons_sol"],
-    regularization_param=ensemble_configurations["regularization_parameter_sol"],
-    regularization_exp=ensemble_configurations["kernel_regularizer"],
-    retrain_seed=42,
-    activation_name=ensemble_configurations["activation_sol"],
-    loss=loss_fn,
-    n_iterations_min=ensemble_configurations["iterations_min"],
-    n_iterations_max=ensemble_configurations["iterations_max"],
-    reset_freq=ensemble_configurations["reset_freq"],
+    network_properties=network_props_sol,
 )
 
 test_function_model = PinnsTest(
     input_dimension=Ec.space_dimensions + Ec.time_dimensions,
     output_dimension=Ec.output_dimension,
-    n_hidden_layers=ensemble_configurations["hidden_layers_test"],
-    neurons=ensemble_configurations["neurons_test"],
-    regularization_param=ensemble_configurations["regularization_parameter_test"],
-    regularization_exp=ensemble_configurations["kernel_regularizer"],
-    retrain_seed=42,
-    activation_name=ensemble_configurations["activation_test"],
-    loss=loss_fn,
-    n_iterations_min=ensemble_configurations["iterations_min"],
-    n_iterations_max=ensemble_configurations["iterations_max"],
-    reset_freq=ensemble_configurations["reset_freq"],
+    network_properties=network_props_test,
 )
 
 optimizer_min = optim.Adam(solution_model.parameters(),
@@ -131,18 +138,13 @@ optimizer_max = optim.Adam(test_function_model.parameters(),
 print("Training wPINNs on Moving Shock …  (this takes ~4 hours on CPU)")
 t0 = time.time()
 
-best_model, best_losses = fit(
+best_losses, best_model, _ = fit(
     Ec,
     solution_model,
     test_function_model,
-    dataset.data_coll,
-    dataset.data_boundary,
-    dataset.data_initial_internal,
     optimizer_min,
     optimizer_max,
-    ensemble_configurations["epochs"],
-    ensemble_configurations["residual_parameter"],
-    output_dir,
+    dataset,
 )
 
 elapsed = time.time() - t0
