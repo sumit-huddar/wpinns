@@ -138,6 +138,16 @@ test_function_model = PinnsTest(
     network_properties=network_props_test,
 )
 
+# Move networks onto the GPU when one is available (Ec.device is already cuda
+# in that case, and the fit loop moves the training tensors to it). Without
+# this the model weights stay on CPU and you get a device-mismatch error.
+if torch.cuda.is_available():
+    print(f"Using GPU: {torch.cuda.get_device_name(0)}")
+    solution_model.cuda()
+    test_function_model.cuda()
+else:
+    print("No GPU found — running on CPU.")
+
 optimizer_min = optim.Adam(solution_model.parameters(),
                            lr=ensemble_configurations["tau_sol"], amsgrad=True)
 optimizer_max = optim.Adam(test_function_model.parameters(),
@@ -154,6 +164,8 @@ best_losses, best_model, _ = fit(
     optimizer_min,
     optimizer_max,
     dataset,
+    checkpoint_path=os.path.join(output_dir, "ModelSol.pkl"),
+    checkpoint_freq=500,
 )
 
 elapsed = time.time() - t0

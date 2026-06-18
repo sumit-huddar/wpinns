@@ -70,7 +70,8 @@ class CustomLoss(torch.nn.Module):
             return loss_v, 0, 0, [0, 0, 0], loss_pde_no_norm
 
 
-def fit(Ec, solution_model, test_function_model, optimizer_min, optimizer_max, training_set_class, verbose=False):
+def fit(Ec, solution_model, test_function_model, optimizer_min, optimizer_max, training_set_class, verbose=False,
+        checkpoint_path=None, checkpoint_freq=500):
     num_epochs = solution_model.num_epochs
     iterations_max = test_function_model.iterations
     iterations_min = solution_model.iterations
@@ -188,6 +189,12 @@ def fit(Ec, solution_model, test_function_model, optimizer_min, optimizer_max, t
             best_losses[3] = current_losses[3]
             best_losses[4] = current_losses[4]
             best_train = current_losses[0]
+
+        # Periodic checkpoint of the best-so-far solution model, so a crash or
+        # Colab disconnect mid-run doesn't lose everything.
+        if checkpoint_path is not None and (epoch + 1) % checkpoint_freq == 0 and best_solution_model is not None:
+            torch.save(best_solution_model, checkpoint_path)
+            print(f"[checkpoint] epoch {epoch + 1}: saved best model (loss {best_train:.3e}) -> {checkpoint_path}")
 
         my_lr_scheduler_min.step()
         my_lr_scheduler_max.step()
