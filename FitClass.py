@@ -47,10 +47,16 @@ class CustomLoss(torch.nn.Module):
                 print("############### MINIMIZING ###############")
             loss_pde, loss_pde_no_norm = Ec.compute_res(network_sol, network_test, x_f_train, minimizing)
             loss_v = lambda_res * loss_vars.to(Ec.device) + loss_pde.to(Ec.device) + lambda_reg_sol * loss_reg_sol.to(Ec.device) + lambda_reg_test * loss_reg_test.to(Ec.device)
+
+            if getattr(Ec, "use_bound_penalty", False):
+                loss_bound = Ec.compute_bound_penalty(network_sol, x_f_train).to(Ec.device)
+                loss_v = loss_v + Ec.lambda_bound * loss_bound
             if verbose:
                 print("###############################################################################################################")
                 print("Function Loss    : ", (loss_vars ** (1 / Ec.p)).detach().cpu().numpy(),
                       "\nPDE Residual     : ", (loss_pde_no_norm ** (1 / Ec.p)).detach().cpu().numpy())
+                if getattr(Ec, "use_bound_penalty", False):
+                    print("Bound Penalty    : ", float(loss_bound.detach().cpu().numpy()))
                 print()
                 print()
 

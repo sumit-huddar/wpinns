@@ -43,6 +43,13 @@ class EquationClass(EquationBaseClass):
         self.c_mode = "max"
         self.use_relu = True
 
+        # ── Boundedness penalty (experimental, off by default) ──────────────
+        # The entropy solution satisfies a maximum principle: u stays within
+        # [min(u0), max(u0)] over the domain. Enabling this adds a soft penalty
+        # to the minimizing loss whenever the solution network leaves that band.
+        self.use_bound_penalty = False
+        self.lambda_bound = 10.0
+
     def add_collocation_points(self, n_coll, random_seed):
         return self.square_domain.add_collocation_points(n_coll, random_seed)
 
@@ -153,6 +160,22 @@ class EquationClass(EquationBaseClass):
     def compute_res_sol(self, network_sol, x_f_train):
 
         return torch.tensor(1.)
+
+    def bounds(self):
+        """Physical lower/upper bounds for u from the maximum principle:
+        the entropy solution stays within the range of the initial data."""
+        grid = torch.linspace(-1, 1, 1000)
+        u0 = self.u0(grid)
+        return torch.min(u0), torch.max(u0)
+
+    def compute_bound_penalty(self, network_sol, x_f_train):
+        """Soft penalty (mean p-th power of the violation) for the solution
+        network leaving [u_min, u_max] at the collocation points."""
+        u = network_sol(x_f_train).reshape(-1, )
+        lo, hi = self.bounds()
+        over = torch.relu(u - hi)
+        under = torch.relu(lo - u)
+        return torch.mean(over ** self.p + under ** self.p)
 
     def ubx0(self, t):
         type_BC = [DirichletBC()]

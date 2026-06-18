@@ -18,6 +18,13 @@ import torch
 import torch.optim as optim
 
 
+# ── Experiment toggles ─────────────────────────────────────────────────────
+# Boundedness penalty: punish the solution network for leaving [u_min, u_max]
+# (the maximum-principle band, [0, 1] for the moving shock). Set to False to
+# reproduce the baseline run.
+USE_BOUND_PENALTY = True
+LAMBDA_BOUND = 10.0
+
 # ── patch: override what_solving before the class is used ──────────────────
 from EquationModels import ShockRarEntropy as _src
 
@@ -28,6 +35,8 @@ def _patched_init(self, norm, cutoff, weak_form, p):
     self.what_solving = "Moving"
     # Moving shock: t ∈ [0, 0.45], x ∈ [-1, 1]  (same domain as rarefaction)
     self.extrema_values = torch.tensor([[0, 0.45], [-1., 1.]])
+    self.use_bound_penalty = USE_BOUND_PENALTY
+    self.lambda_bound = LAMBDA_BOUND
 
 _src.EquationClass.__init__ = _patched_init
 # ───────────────────────────────────────────────────────────────────────────
@@ -69,7 +78,7 @@ ensemble_configurations = {
     "loss_type": "l2",
 }
 
-output_dir = os.path.join("ShockWave", "best")
+output_dir = os.path.join("ShockWave", "bound_penalty" if USE_BOUND_PENALTY else "best")
 os.makedirs(output_dir, exist_ok=True)
 
 # ── Build equation / dataset ───────────────────────────────────────────────
