@@ -110,6 +110,7 @@ class EquationClass(EquationBaseClass):
     def compute_res(self, network_sol, network_test, x_f_train, minimizing):
 
         x_f_train.requires_grad = True
+        device = x_f_train.device
 
         u = network_sol(x_f_train).reshape(-1, )
         theta = network_test(x_f_train).reshape(-1, )
@@ -120,7 +121,7 @@ class EquationClass(EquationBaseClass):
         max_c = 2 * torch.max(self.u0(torch.linspace(-1, 1, 1000)))
 
         N = 401
-        c_vec = torch.linspace(float(min_c), float(max_c), N)
+        c_vec = torch.linspace(float(min_c), float(max_c), N, device=device)
 
         grad_u = torch.autograd.grad(u, x_f_train, grad_outputs=torch.ones_like(u), create_graph=True)[0]
         grad_u_t = grad_u[:, 0].reshape(-1, )
@@ -130,14 +131,14 @@ class EquationClass(EquationBaseClass):
 
         norm_test = self.return_norm(phi, grad_phi_x) ** 2
 
-        res_pde_no_norm_mean = torch.tensor(0.)
-        res_pde_no_norm_max = torch.tensor(0.)
+        res_pde_no_norm_mean = torch.tensor(0., device=device)
+        res_pde_no_norm_max = torch.tensor(0., device=device)
         for i, c in enumerate(c_vec):
             if self.weak_form == "partial":
                 res_pde_no_norm_i = torch.mean(self.sign(u - c) * (grad_u_t * phi - grad_phi_x * (u * u / 2.0 - c * c / 2.0)))
                 if self.use_relu:
                     res_pde_no_norm_i = torch.relu(res_pde_no_norm_i) + 1e-12
-                res_pde_no_norm_i = network_sol.loss(torch.tensor(0.), res_pde_no_norm_i)
+                res_pde_no_norm_i = network_sol.loss(torch.tensor(0., device=device), res_pde_no_norm_i)
             else:
                 res_pde_no_norm_i = torch.relu(-torch.mean(self.abs(u - c) * grad_phi_t + self.sign(u - c) * grad_phi_x * (u * u / 2.0 - c * c / 2.0))) ** 2
 
@@ -173,6 +174,7 @@ class EquationClass(EquationBaseClass):
         network leaving [u_min, u_max] at the collocation points."""
         u = network_sol(x_f_train).reshape(-1, )
         lo, hi = self.bounds()
+        lo, hi = float(lo), float(hi)
         over = torch.relu(u - hi)
         under = torch.relu(lo - u)
         return torch.mean(over ** self.p + under ** self.p)
