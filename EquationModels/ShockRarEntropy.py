@@ -138,7 +138,7 @@ class EquationClass(EquationBaseClass):
                 res_pde_no_norm_i = torch.mean(self.sign(u - c) * (grad_u_t * phi - grad_phi_x * (u * u / 2.0 - c * c / 2.0)))
                 if self.use_relu:
                     res_pde_no_norm_i = torch.relu(res_pde_no_norm_i) + 1e-12
-                res_pde_no_norm_i = network_sol.loss(torch.tensor(0., device=device), res_pde_no_norm_i)
+                res_pde_no_norm_i = network_sol.loss(torch.zeros_like(res_pde_no_norm_i), res_pde_no_norm_i)
             else:
                 res_pde_no_norm_i = torch.relu(-torch.mean(self.abs(u - c) * grad_phi_t + self.sign(u - c) * grad_phi_x * (u * u / 2.0 - c * c / 2.0))) ** 2
 
