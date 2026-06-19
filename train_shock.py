@@ -61,7 +61,7 @@ ensemble_configurations = {
     "regularization_parameter_sol":  0.,
     "regularization_parameter_test": 0.,
     "batch_size": N_coll + N_u + N_int,
-    "epochs": 5000,
+    "epochs": 3000,
     "norm": "H1",
     "cutoff": "def_max",
     "weak_form": "partial",
@@ -69,8 +69,19 @@ ensemble_configurations = {
     "loss_type": "l2",
 }
 
-output_dir = os.path.join("ShockWave", "best")
+# ── Experiment: uniform vs residual-adaptive collocation sampling ───────────
+# Both runs use identical config; only the collocation sampling differs.
+#   USE_ADAPTIVE_SAMPLING=False -> original solver, uniform points
+#   USE_ADAPTIVE_SAMPLING=True  -> every RESAMPLE_FREQ epochs, move points
+#                                  toward the highest-residual region (shock)
+USE_ADAPTIVE_SAMPLING = True
+RESAMPLE_FREQ = 250
+RESAMPLE_UNIFORM_FRAC = 0.5
+
+variant = "adaptive" if USE_ADAPTIVE_SAMPLING else "uniform"
+output_dir = os.path.join("ShockWave", variant)
 os.makedirs(output_dir, exist_ok=True)
+print(f"Variant: {variant}  ->  {output_dir}")
 
 # ── Build equation / dataset ───────────────────────────────────────────────
 Ec = EquationClass(
@@ -135,7 +146,7 @@ optimizer_max = optim.Adam(test_function_model.parameters(),
                            lr=ensemble_configurations["tau_test"], amsgrad=True)
 
 # ── Train ──────────────────────────────────────────────────────────────────
-print("Training wPINNs on Moving Shock …  (this takes ~4 hours on CPU)")
+print("Training wPINNs on Moving Shock …  (3000 epochs; ~2-3 hours on CPU)")
 t0 = time.time()
 
 best_losses, best_model, _ = fit(
@@ -145,6 +156,8 @@ best_losses, best_model, _ = fit(
     optimizer_min,
     optimizer_max,
     dataset,
+    resample_freq=(RESAMPLE_FREQ if USE_ADAPTIVE_SAMPLING else 0),
+    resample_uniform_frac=RESAMPLE_UNIFORM_FRAC,
 )
 
 elapsed = time.time() - t0
