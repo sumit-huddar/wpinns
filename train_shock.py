@@ -19,7 +19,8 @@ import torch.optim as optim
 
 
 # ── Case: "Rarefaction" (fan) or "Moving" (right-moving shock) ──────────────
-CASE = "Rarefaction"
+# Override at run time with the WPINN_CASE env var.
+CASE = os.environ.get("WPINN_CASE", "Rarefaction")
 
 # ── patch: override what_solving before the class is used ──────────────────
 from EquationModels import ShockRarEntropy as _src
@@ -77,7 +78,8 @@ ensemble_configurations = {
 #   USE_ADAPTIVE_SAMPLING=False -> original solver, uniform points
 #   USE_ADAPTIVE_SAMPLING=True  -> every RESAMPLE_FREQ epochs, move points
 #                                  toward the highest-residual region (shock)
-USE_ADAPTIVE_SAMPLING = True
+# Override USE_ADAPTIVE_SAMPLING at run time with WPINN_ADAPTIVE=0/1.
+USE_ADAPTIVE_SAMPLING = os.environ.get("WPINN_ADAPTIVE", "1") == "1"
 RESAMPLE_FREQ = 250
 RESAMPLE_UNIFORM_FRAC = 0.5
 
