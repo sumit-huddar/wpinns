@@ -195,7 +195,7 @@ def fit(Ec, solution_model, test_function_model, optimizer_min, optimizer_max, t
             training_set_class.resample_collocation(
                 solution_model, pool_factor=resample_pool_factor,
                 uniform_frac=resample_uniform_frac, seed=epoch)
-            print(f"[resample] epoch {epoch + 1}: refreshed collocation points toward high-residual (shock) region")
+            print(f"[resample] epoch {epoch + 1}: refreshed collocation points toward the highest-residual region")
 
         my_lr_scheduler_min.step()
         my_lr_scheduler_max.step()

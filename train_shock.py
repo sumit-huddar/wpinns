@@ -18,6 +18,9 @@ import torch
 import torch.optim as optim
 
 
+# ── Case: "Rarefaction" (fan) or "Moving" (right-moving shock) ──────────────
+CASE = "Rarefaction"
+
 # ── patch: override what_solving before the class is used ──────────────────
 from EquationModels import ShockRarEntropy as _src
 
@@ -25,8 +28,8 @@ _OrigInit = _src.EquationClass.__init__
 
 def _patched_init(self, norm, cutoff, weak_form, p):
     _OrigInit(self, norm, cutoff, weak_form, p)
-    self.what_solving = "Moving"
-    # Moving shock: t ∈ [0, 0.45], x ∈ [-1, 1]  (same domain as rarefaction)
+    self.what_solving = CASE
+    # t ∈ [0, 0.45], x ∈ [-1, 1]
     self.extrema_values = torch.tensor([[0, 0.45], [-1., 1.]])
 
 _src.EquationClass.__init__ = _patched_init
@@ -79,9 +82,10 @@ RESAMPLE_FREQ = 250
 RESAMPLE_UNIFORM_FRAC = 0.5
 
 variant = "adaptive" if USE_ADAPTIVE_SAMPLING else "uniform"
-output_dir = os.path.join("ShockWave", variant)
+base_dir = "RarefactionWave" if CASE == "Rarefaction" else "ShockWave"
+output_dir = os.path.join(base_dir, variant)
 os.makedirs(output_dir, exist_ok=True)
-print(f"Variant: {variant}  ->  {output_dir}")
+print(f"Case: {CASE}   Variant: {variant}  ->  {output_dir}")
 
 # ── Build equation / dataset ───────────────────────────────────────────────
 Ec = EquationClass(
@@ -146,7 +150,7 @@ optimizer_max = optim.Adam(test_function_model.parameters(),
                            lr=ensemble_configurations["tau_test"], amsgrad=True)
 
 # ── Train ──────────────────────────────────────────────────────────────────
-print("Training wPINNs on Moving Shock …  (3000 epochs; ~2-3 hours on CPU)")
+print(f"Training wPINNs on {CASE} …  (3000 epochs; ~2-3 hours on CPU)")
 t0 = time.time()
 
 best_losses, best_model, _ = fit(
@@ -170,7 +174,7 @@ print(f"Model saved → {output_dir}/ModelSol.pkl")
 print(f"L1 error = {L2:.6f},  Relative L1 = {L2_rel:.6f}")
 
 with open(os.path.join(output_dir, "InfoModel.txt"), "w") as f:
-    f.write(f"what_solving, Moving\n")
+    f.write(f"what_solving, {CASE}\n")
     f.write(f"train_time, {elapsed}\n")
     f.write(f"L2_norm_test, {L2}\n")
     f.write(f"rel_L2_norm, {L2_rel}\n")
