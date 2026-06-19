@@ -175,7 +175,7 @@ best_losses, best_model, _ = fit(
     optimizer_max,
     dataset,
     checkpoint_path=checkpoint_path,
-    checkpoint_freq=500,
+    checkpoint_freq=100,
     state_path=state_path,
 )
 
