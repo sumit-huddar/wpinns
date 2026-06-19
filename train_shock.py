@@ -18,11 +18,13 @@ import torch
 import torch.optim as optim
 
 
-# ── Experiment toggles ─────────────────────────────────────────────────────
-# Boundedness penalty: punish the solution network for leaving [u_min, u_max]
-# (the maximum-principle band, [0, 1] for the moving shock). Set to False to
-# reproduce the baseline run.
-USE_BOUND_PENALTY = True
+# ── Experiment variant ─────────────────────────────────────────────────────
+# How to enforce the maximum-principle bounds [u_min, u_max] ([0, 1] for the
+# moving shock). Pick at most one; both False reproduces the baseline run.
+#   USE_BOUND_PENALTY : soft penalty added to the loss (can smear the shock)
+#   USE_HARD_BOUNDS   : scaled-sigmoid output, bounds guaranteed by construction
+USE_BOUND_PENALTY = False
+USE_HARD_BOUNDS   = True
 LAMBDA_BOUND = 10.0
 
 # ── patch: override what_solving before the class is used ──────────────────
@@ -70,7 +72,7 @@ ensemble_configurations = {
     "regularization_parameter_sol":  0.,
     "regularization_parameter_test": 0.,
     "batch_size": N_coll + N_u + N_int,
-    "epochs": 5000,
+    "epochs": 3000,
     "norm": "H1",
     "cutoff": "def_max",
     "weak_form": "partial",
@@ -78,7 +80,8 @@ ensemble_configurations = {
     "loss_type": "l2",
 }
 
-output_dir = os.path.join("ShockWave", "bound_penalty" if USE_BOUND_PENALTY else "best")
+variant = "hard_bounds" if USE_HARD_BOUNDS else ("bound_penalty" if USE_BOUND_PENALTY else "best")
+output_dir = os.path.join("ShockWave", variant)
 os.makedirs(output_dir, exist_ok=True)
 
 # Checkpoints (best model + full resume state) go here. Point this at a Google
@@ -158,13 +161,19 @@ if torch.cuda.is_available():
 else:
     print("No GPU found — running on CPU.")
 
+# Hard constraint: force the solution network output into the physical band.
+if USE_HARD_BOUNDS:
+    lo, hi = Ec.bounds()
+    solution_model.set_output_bounds(lo, hi)
+    print(f"Hard output bounds: u in [{float(lo):.3g}, {float(hi):.3g}]")
+
 optimizer_min = optim.Adam(solution_model.parameters(),
                            lr=ensemble_configurations["tau_sol"], amsgrad=True)
 optimizer_max = optim.Adam(test_function_model.parameters(),
                            lr=ensemble_configurations["tau_test"], amsgrad=True)
 
 # ── Train ──────────────────────────────────────────────────────────────────
-print("Training wPINNs on Moving Shock …  (this takes ~4 hours on CPU)")
+print("Training wPINNs on Moving Shock …  (3000 epochs; ~2-3 hours on CPU)")
 t0 = time.time()
 
 best_losses, best_model, _ = fit(
