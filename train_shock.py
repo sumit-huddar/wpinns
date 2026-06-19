@@ -81,6 +81,16 @@ ensemble_configurations = {
 output_dir = os.path.join("ShockWave", "bound_penalty" if USE_BOUND_PENALTY else "best")
 os.makedirs(output_dir, exist_ok=True)
 
+# Checkpoints (best model + full resume state) go here. Point this at a Google
+# Drive folder so they survive a Colab disconnect, e.g. run with:
+#   WPINN_CKPT_DIR=/content/drive/MyDrive/wpinns_out python train_shock.py
+# Re-running with the same dir auto-resumes from the last saved state.
+ckpt_dir = os.environ.get("WPINN_CKPT_DIR", output_dir)
+os.makedirs(ckpt_dir, exist_ok=True)
+checkpoint_path = os.path.join(ckpt_dir, "ModelSol.pkl")
+state_path = os.path.join(ckpt_dir, "train_state.pt")
+print(f"Checkpoints -> {ckpt_dir}")
+
 # ── Build equation / dataset ───────────────────────────────────────────────
 Ec = EquationClass(
     norm=ensemble_configurations["norm"],
@@ -164,8 +174,9 @@ best_losses, best_model, _ = fit(
     optimizer_min,
     optimizer_max,
     dataset,
-    checkpoint_path=os.path.join(output_dir, "ModelSol.pkl"),
+    checkpoint_path=checkpoint_path,
     checkpoint_freq=500,
+    state_path=state_path,
 )
 
 elapsed = time.time() - t0

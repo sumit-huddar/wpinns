@@ -1,3 +1,4 @@
+import os
 import copy
 import torch
 import torch.nn as nn
@@ -71,7 +72,7 @@ class CustomLoss(torch.nn.Module):
 
 
 def fit(Ec, solution_model, test_function_model, optimizer_min, optimizer_max, training_set_class, verbose=False,
-        checkpoint_path=None, checkpoint_freq=500):
+        checkpoint_path=None, checkpoint_freq=500, state_path=None):
     num_epochs = solution_model.num_epochs
     iterations_max = test_function_model.iterations
     iterations_min = solution_model.iterations
@@ -98,7 +99,26 @@ def fit(Ec, solution_model, test_function_model, optimizer_min, optimizer_max, t
     my_lr_scheduler_min = torch.optim.lr_scheduler.LambdaLR(optimizer=optimizer_min, lr_lambda=lambda1)
     my_lr_scheduler_max = torch.optim.lr_scheduler.LambdaLR(optimizer=optimizer_max, lr_lambda=lambda1)
 
-    for epoch in range(num_epochs):  # loop over the dataset multiple times
+    # Resume from a saved training state (models + optimizers + schedulers) if one
+    # exists, so a crash or Colab disconnect continues instead of restarting at 0.
+    start_epoch = 0
+    if state_path is not None and os.path.exists(state_path):
+        state = torch.load(state_path, map_location=Ec.device)
+        solution_model.load_state_dict(state["solution_model"])
+        test_function_model.load_state_dict(state["test_function_model"])
+        optimizer_min.load_state_dict(state["optimizer_min"])
+        optimizer_max.load_state_dict(state["optimizer_max"])
+        my_lr_scheduler_min.load_state_dict(state["scheduler_min"])
+        my_lr_scheduler_max.load_state_dict(state["scheduler_max"])
+        best_train = state["best_train"]
+        best_losses = state["best_losses"]
+        start_epoch = state["epoch"]
+        if state["best_solution_model"] is not None:
+            best_solution_model = copy.deepcopy(solution_model)
+            best_solution_model.load_state_dict(state["best_solution_model"])
+        print(f"[resume] found state at '{state_path}' -> continuing from epoch {start_epoch}")
+
+    for epoch in range(start_epoch, num_epochs):  # loop over the dataset multiple times
 
         if epoch % reset_freq == 0 and epoch != 0:
             print("Resetting Params")
@@ -190,11 +210,27 @@ def fit(Ec, solution_model, test_function_model, optimizer_min, optimizer_max, t
             best_losses[4] = current_losses[4]
             best_train = current_losses[0]
 
-        # Periodic checkpoint of the best-so-far solution model, so a crash or
-        # Colab disconnect mid-run doesn't lose everything.
-        if checkpoint_path is not None and (epoch + 1) % checkpoint_freq == 0 and best_solution_model is not None:
-            torch.save(best_solution_model, checkpoint_path)
-            print(f"[checkpoint] epoch {epoch + 1}: saved best model (loss {best_train:.3e}) -> {checkpoint_path}")
+        # Periodic checkpoint, so a crash or Colab disconnect mid-run doesn't lose
+        # progress. We save (a) the best-so-far solution model for direct use, and
+        # (b) a full training state (models + optimizers + schedulers) for resuming.
+        if (epoch + 1) % checkpoint_freq == 0:
+            if checkpoint_path is not None and best_solution_model is not None:
+                torch.save(best_solution_model, checkpoint_path)
+                print(f"[checkpoint] epoch {epoch + 1}: saved best model (loss {best_train:.3e}) -> {checkpoint_path}")
+            if state_path is not None:
+                torch.save({
+                    "epoch": epoch + 1,
+                    "solution_model": solution_model.state_dict(),
+                    "test_function_model": test_function_model.state_dict(),
+                    "optimizer_min": optimizer_min.state_dict(),
+                    "optimizer_max": optimizer_max.state_dict(),
+                    "scheduler_min": my_lr_scheduler_min.state_dict(),
+                    "scheduler_max": my_lr_scheduler_max.state_dict(),
+                    "best_train": best_train,
+                    "best_losses": best_losses,
+                    "best_solution_model": best_solution_model.state_dict() if best_solution_model is not None else None,
+                }, state_path)
+                print(f"[checkpoint] epoch {epoch + 1}: saved resume state -> {state_path}")
 
         my_lr_scheduler_min.step()
         my_lr_scheduler_max.step()
