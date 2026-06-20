@@ -1,0 +1,5 @@
+what_solving, SineBump
+train_time, 2158.976452112198
+L1_vs_godunov, 0.08099965751171112
+rel_L1_vs_godunov, 0.25455254316329956
+loss_tot, 0.00010337962794437772
