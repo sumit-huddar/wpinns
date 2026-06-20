@@ -1,4 +1,5 @@
 import torch
+import numpy as np
 import torch.utils
 import torch.utils.data
 from torch.utils.data import DataLoader
@@ -43,6 +44,7 @@ class DefineDataset:
     def assemble_dataset(self):
 
         fraction_coll = int(self.batches * self.n_collocation / self.n_samples)
+        self.fraction_coll = fraction_coll
         fraction_boundary = int(self.batches * 2 * self.n_boundary * self.space_dimensions / self.n_samples)
         fraction_initial = int(self.batches * self.n_initial / self.n_samples)
         fraction_internal = int(self.batches * self.n_internal / self.n_samples)
@@ -84,3 +86,29 @@ class DefineDataset:
         else:
             self.data_initial_internal = DataLoader(torch.utils.data.TensorDataset(x_time_internal, y_time_internal), batch_size=fraction_initial + fraction_internal,
                                                     shuffle=self.shuffle)
+
+    def resample_collocation(self, model, pool_factor=10, uniform_frac=0.5, seed=0):
+        """Residual-adaptive resampling of the collocation set: draw a large
+        uniform candidate pool, score each point by the model's pointwise PDE
+        residual, then rebuild the collocation set with `uniform_frac` kept
+        uniform (coverage) and the rest sampled ∝ residual (near the shock)."""
+        if self.n_collocation == 0:
+            return
+        n = self.n_collocation
+        pool, _ = self.Ec.add_collocation_points(n * pool_factor, seed)
+        score = self.Ec.pointwise_residual(model, pool).numpy()
+
+        rng = np.random.default_rng(seed)
+        n_unif = int(uniform_frac * n)
+        n_adapt = n - n_unif
+
+        p = score + 1e-8
+        p = p / p.sum()
+        idx_adapt = rng.choice(len(pool), size=n_adapt, replace=False, p=p)
+        idx_unif = rng.choice(len(pool), size=n_unif, replace=False)
+        idx = np.concatenate([idx_adapt, idx_unif])
+
+        x_new = pool[idx]
+        y_new = torch.full((x_new.shape[0], self.output_dimension), np.nan)
+        self.data_coll = DataLoader(torch.utils.data.TensorDataset(x_new, y_new),
+                                    batch_size=self.fraction_coll, shuffle=self.shuffle)

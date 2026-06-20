@@ -154,6 +154,19 @@ class EquationClass(EquationBaseClass):
 
         return torch.tensor(1.)
 
+    def pointwise_residual(self, model, x):
+        """Per-point strong-form Burgers residual |u_t + u·u_x|, used as the
+        importance score for adaptive collocation resampling. Peaks where the
+        solution is hardest to fit — the shock that forms from the hump."""
+        device = next(model.parameters()).device
+        x = x.clone().detach().to(device).requires_grad_(True)
+        u = model(x).reshape(-1, )
+        grad_u = torch.autograd.grad(u, x, grad_outputs=torch.ones_like(u), create_graph=False)[0]
+        u_t = grad_u[:, 0]
+        u_x = grad_u[:, 1]
+        r = u_t + u * u_x
+        return r.abs().detach().cpu()
+
     def ubx0(self, t):
         type_BC = [DirichletBC()]
         if self.what_solving == "Rarefaction":

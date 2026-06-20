@@ -68,9 +68,15 @@ ensemble_configurations = {
     "loss_type": "l2",
 }
 
-output_dir = os.path.join("SineBump", "best")
+# Residual-adaptive collocation sampling (override with WPINN_ADAPTIVE=0/1).
+USE_ADAPTIVE_SAMPLING = os.environ.get("WPINN_ADAPTIVE", "0") == "1"
+RESAMPLE_FREQ = 250
+RESAMPLE_UNIFORM_FRAC = 0.5
+
+variant = "adaptive" if USE_ADAPTIVE_SAMPLING else "best"
+output_dir = os.path.join("SineBump", variant)
 os.makedirs(output_dir, exist_ok=True)
-print(f"IC: half-sine hump in [-0.5, 0.5], zero elsewhere  ->  {output_dir}")
+print(f"IC: half-sine hump in [-0.5, 0.5], zero elsewhere   variant: {variant}  ->  {output_dir}")
 
 # ── Build equation / dataset ───────────────────────────────────────────────
 Ec = EquationClass(
@@ -145,6 +151,8 @@ best_losses, best_model, _ = fit(
     optimizer_min,
     optimizer_max,
     dataset,
+    resample_freq=(RESAMPLE_FREQ if USE_ADAPTIVE_SAMPLING else 0),
+    resample_uniform_frac=RESAMPLE_UNIFORM_FRAC,
 )
 
 elapsed = time.time() - t0
