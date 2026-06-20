@@ -1,0 +1,7 @@
+mode, optimal
+hard_bounds, True
+adaptive, True
+train_time, 2231.595347881317
+L1, 0.004416089039295912
+rel_L1, 0.007958637550473213
+loss_tot, 0.005130843899678439

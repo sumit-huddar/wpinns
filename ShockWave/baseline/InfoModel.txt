@@ -1,0 +1,7 @@
+mode, baseline
+hard_bounds, False
+adaptive, False
+train_time, 2162.9762020111084
+L1, 0.019649535417556763
+rel_L1, 0.03541477769613266
+loss_tot, 0.0006489877487183549
