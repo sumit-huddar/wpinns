@@ -50,12 +50,10 @@ def godunov(case: str, nx: int = 500, cfl: float = 0.9):
     t_vec     : (nt,)   time values at which solution is stored
     U         : (nt, nx) solution array
     """
-    if case == "Rarefaction":
-        x_min, x_max, T = -1.0, 1.0, 0.45
-    elif case == "Moving":
+    if case in ("Rarefaction", "Moving", "SineBump"):
         x_min, x_max, T = -1.0, 1.0, 0.45
     else:
-        raise ValueError(f"Unknown case '{case}'. Use 'Rarefaction' or 'Moving'.")
+        raise ValueError(f"Unknown case '{case}'. Use 'Rarefaction', 'Moving', or 'SineBump'.")
 
     dx = (x_max - x_min) / nx
     x_centers = np.linspace(x_min + 0.5 * dx, x_max - 0.5 * dx, nx)
@@ -64,9 +62,12 @@ def godunov(case: str, nx: int = 500, cfl: float = 0.9):
     if case == "Rarefaction":
         u = np.where(x_centers <= 0.0, -1.0, 1.0).astype(float)
         u_left_bc, u_right_bc = -1.0, 1.0
-    else:  # Moving shock
+    elif case == "Moving":
         u = np.where(x_centers <= 0.0, 1.0, 0.0).astype(float)
         u_left_bc, u_right_bc = 1.0, 0.0
+    else:  # SineBump: half-sine hump in [-0.5, 0.5], zero outside
+        u = np.where(np.abs(x_centers) <= 0.5, np.sin(np.pi * (x_centers + 0.5)), 0.0).astype(float)
+        u_left_bc, u_right_bc = 0.0, 0.0
 
     t = 0.0
     t_vec = [t]

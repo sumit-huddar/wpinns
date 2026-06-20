@@ -162,7 +162,7 @@ class EquationClass(EquationBaseClass):
         elif self.what_solving == "Rarefaction_m":
             out = torch.full(size=(t.shape[0], 1), fill_value=0)
             return out.reshape(-1, 1), type_BC
-        elif self.what_solving == "sine" or self.what_solving == "gauss":
+        elif self.what_solving == "sine" or self.what_solving == "gauss" or self.what_solving == "SineBump":
             out = torch.full(size=(t.shape[0], 1), fill_value=0)
             return out.reshape(-1, 1), type_BC
         else:
@@ -186,7 +186,7 @@ class EquationClass(EquationBaseClass):
         elif self.what_solving == "Rarefaction" or self.what_solving == "Rarefaction_m":
             out = torch.full(size=(t.shape[0], 1), fill_value=1.)
             return out.reshape(-1, 1), type_BC
-        elif self.what_solving == "sine" or self.what_solving == "gauss":
+        elif self.what_solving == "sine" or self.what_solving == "gauss" or self.what_solving == "SineBump":
             out = torch.full(size=(t.shape[0], 1), fill_value=0)
             return out.reshape(-1, 1), type_BC
 
@@ -220,6 +220,10 @@ class EquationClass(EquationBaseClass):
             return u.reshape(-1, 1)
         elif self.what_solving == "gauss":
             u = torch.exp(-x ** 2 / (0.2 ** 2))
+            return u.reshape(-1, 1)
+        elif self.what_solving == "SineBump":
+            # half-sine hump in [-0.5, 0.5] (peak 1 at x=0), zero outside
+            u = torch.where((x >= -0.5) & (x <= 0.5), torch.sin(pi * (x + 0.5)), torch.zeros_like(x))
             return u.reshape(-1, 1)
 
     def exact(self, inputs):
@@ -304,8 +308,30 @@ class EquationClass(EquationBaseClass):
                     sol[i] = 0
                 elif x_i > t_i:
                     sol[i] = 1
+        elif self.what_solving == "SineBump":
+            # No closed form — use the fine-grid Godunov reference as ground truth.
+            interp = self._sinebump_interp()
+            t = inputs[:, 0].detach().cpu().numpy()
+            x = inputs[:, 1].detach().cpu().numpy()
+            vals = interp(np.column_stack([t, x]))
+            sol = torch.from_numpy(vals).float()
 
         return sol.reshape(-1, 1)
+
+    def _sinebump_interp(self):
+        """Lazily build a Godunov reference for the sine-bump IC and return a
+        RegularGridInterpolator over (t, x). Burgers has no closed-form solution
+        here, so the fine-grid Godunov result is the ground truth."""
+        if getattr(self, "_sb_interp", None) is None:
+            from godunov import godunov
+            from scipy.interpolate import RegularGridInterpolator
+            xg, tv, U = godunov("SineBump", nx=2000, cfl=0.9)
+            tu = np.linspace(0.0, float(self.extrema_values[0, 1]), 300)
+            Uu = np.empty((tu.shape[0], xg.shape[0]))
+            for j in range(xg.shape[0]):
+                Uu[:, j] = np.interp(tu, tv, U[:, j])
+            self._sb_interp = RegularGridInterpolator((tu, xg), Uu, bounds_error=False, fill_value=None)
+        return self._sb_interp
 
     def compute_generalization_error(self, model, extrema=None, images_path=None):
         model.eval()
