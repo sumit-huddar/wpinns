@@ -64,7 +64,8 @@ class CustomLoss(torch.nn.Module):
             return loss_v, 0, 0, [0, 0, 0], loss_pde_no_norm
 
 
-def fit(Ec, solution_model, test_function_model, optimizer_min, optimizer_max, training_set_class, verbose=False):
+def fit(Ec, solution_model, test_function_model, optimizer_min, optimizer_max, training_set_class, verbose=False,
+        resample_freq=0, resample_pool_factor=10, resample_uniform_frac=0.5):
     num_epochs = solution_model.num_epochs
     iterations_max = test_function_model.iterations
     iterations_min = solution_model.iterations
@@ -92,6 +93,10 @@ def fit(Ec, solution_model, test_function_model, optimizer_min, optimizer_max, t
     my_lr_scheduler_max = torch.optim.lr_scheduler.LambdaLR(optimizer=optimizer_max, lr_lambda=lambda1)
 
     for epoch in range(num_epochs):  # loop over the dataset multiple times
+
+        # Re-read the collocation loader each epoch so adaptive resampling (below)
+        # takes effect on the next pass.
+        training_coll = training_set_class.data_coll
 
         if epoch % reset_freq == 0 and epoch != 0:
             print("Resetting Params")
@@ -182,6 +187,15 @@ def fit(Ec, solution_model, test_function_model, optimizer_min, optimizer_max, t
             best_losses[3] = current_losses[3]
             best_losses[4] = current_losses[4]
             best_train = current_losses[0]
+
+        # Residual-adaptive resampling: periodically move collocation points to
+        # where the model's PDE residual is largest (the shock). Off when
+        # resample_freq == 0. Skipped on the final epoch (no next pass to use it).
+        if resample_freq and (epoch + 1) % resample_freq == 0 and (epoch + 1) < num_epochs:
+            training_set_class.resample_collocation(
+                solution_model, pool_factor=resample_pool_factor,
+                uniform_frac=resample_uniform_frac, seed=epoch)
+            print(f"[resample] epoch {epoch + 1}: refreshed collocation points toward the highest-residual region")
 
         my_lr_scheduler_min.step()
         my_lr_scheduler_max.step()

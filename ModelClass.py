@@ -92,14 +92,28 @@ class Pinns(nn.Module):
         else:
             self.input_output_layer = nn.Linear(self.input_dimension, self.output_dimension)
 
+        # Optional hard output bounds (set via set_output_bounds); None = unbounded.
+        self.output_lo = None
+        self.output_hi = None
+
+    def set_output_bounds(self, lo, hi):
+        """Constrain forward() output to [lo, hi] via a scaled sigmoid, so the
+        solution can never leave the physical band (no competing loss term)."""
+        self.output_lo = float(lo)
+        self.output_hi = float(hi)
+
     def forward(self, x):
         if self.n_hidden_layers != 0:
             x = self.activation(self.input_layer(x))
             for k, l in enumerate(self.hidden_layers):
                 x = self.activation(l(x))
-            return self.output_layer(x)
+            out = self.output_layer(x)
         else:
-            return self.input_output_layer(x)
+            out = self.input_output_layer(x)
+        lo = getattr(self, "output_lo", None)
+        if lo is not None:
+            out = lo + (self.output_hi - lo) * torch.sigmoid(out)
+        return out
 
 
 class PinnsTest(nn.Module):
