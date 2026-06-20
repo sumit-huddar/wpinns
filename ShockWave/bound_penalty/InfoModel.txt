@@ -1,0 +1,5 @@
+what_solving, Moving
+train_time, 2200.5047278404236
+L2_norm_test, 0.015201953239738941
+rel_L2_norm, 0.02739880420267582
+loss_tot, 2.699714400478115e-05
