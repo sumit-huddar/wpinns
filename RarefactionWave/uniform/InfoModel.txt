@@ -1,0 +1,5 @@
+what_solving, Rarefaction
+train_time, 4048.57178235054
+L2_norm_test, 0.01694370247423649
+rel_L2_norm, 0.019080867990851402
+loss_tot, 0.00012098880051780725
