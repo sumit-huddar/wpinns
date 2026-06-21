@@ -35,6 +35,11 @@ finite-volume solvers for Burgers:
 Error metric throughout: **relative L1** = `mean|u_pred − u_exact| / mean|u_exact|`, evaluated over
 the space–time domain. (L1, not L2, since it is gentler on the thin high-error region at a shock.)
 
+![wPINN vs Lax-Friedrichs vs Godunov on the moving shock](figures/reference_shock.png)
+
+*Moving shock at t = 0.10 / 0.25 / 0.45: the pre-trained wPINN against the Lax-Friedrichs and
+Godunov reference solvers and the exact solution.*
+
 ---
 
 ## Experiments
@@ -62,6 +67,11 @@ Two fixes were compared:
 **Takeaway:** hard bounds win — best accuracy, no over/undershoot, sharp shock. The soft penalty
 removes the undershoot but smears the jump (the penalty fights the fit).
 
+![baseline vs soft penalty vs hard bounds](figures/bounds_variants.png)
+
+*Old wPINN (red) undershoots below 0; the soft penalty (blue) removes it but smears the shock;
+hard bounds (green) stay sharp and inside [0, 1].*
+
 ### 2. Residual-adaptive collocation sampling — `adaptive-sampling-experiment`
 
 Every 250 epochs, move collocation points toward where the pointwise PDE residual `|u_t + u·u_x|`
@@ -79,6 +89,10 @@ apart from one sharp feature (the shock), but **hurts** when there is substantia
 cover (rarefaction, sine bump) — concentrating points there starves the smooth regions, which fill
 with oscillations.
 
+![uniform vs adaptive sampling on the moving shock](figures/adaptive_shock.png)
+
+*Moving shock: residual-adaptive sampling (green) tracks the exact step far better than uniform (red).*
+
 ### 3. A harder initial condition — `sine-ic-experiment`
 
 Tests the wPINN on the **sine-bump** IC (no closed-form solution → Godunov reference). The wPINN
@@ -86,6 +100,11 @@ reaches rel L1 **0.090** — decent but ~3–5× worse than the textbook cases �
 by the shock that forms as the hump steepens (smeared and lagging in position). Confirms, again, that
 **the shock is the wPINN's weak point.** Adaptive sampling here makes it worse (0.255), for the reason
 in experiment 2.
+
+![sine-bump: uniform vs adaptive vs Godunov reference](figures/sinebump.png)
+
+*Sine-bump IC: the wPINN (uniform, red) follows the Godunov reference (black); adaptive sampling
+(green) becomes oscillatory across the smooth structure.*
 
 ### 4. The optimal recipe — `optimal-wpinn`
 
@@ -100,6 +119,11 @@ architecture/seed/3000-epoch budget — only the recipe differs):
 | **optimal** | **0.0086** | [0.002, 0.998] ✅ |
 
 **→ ~75% lower relative L1 error (4× more accurate), and the solution stays physically bounded.**
+
+![baseline vs optimal recipe on the moving shock](figures/optimal_slices.png)
+
+*Baseline (red) vs the optimal recipe (green) vs exact: the optimal model resolves the shock sharply
+and stays within [0, 1] at every time.*
 
 See **`optimal_wpinn.ipynb`** (self-contained, executed with the numbers and plots filled in) and
 `train_optimal.py`.
